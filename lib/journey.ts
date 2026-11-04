@@ -6,10 +6,15 @@ export const PER_CLIP = 63; // frames per transition clip (8 fps × ~8 s)
 const TOTAL = CLIPS * PER_CLIP;
 export const STILLS = ["engagement", "nikah", "mehndi", "baraat", "valima"];
 
-const frameSrc = (i: number) => {
+// Frames are cached by browsers for a year (next.config.ts), so bump this whenever any
+// frame image is replaced; the new query string makes every browser fetch fresh copies.
+// v3: clip 2 rebuilt: sped-up petal sweep, then a regenerated Mehndi-outfit push-in.
+const SEQ_VERSION = "3";
+
+export const frameSrc = (i: number) => {
   const clip = Math.floor(i / PER_CLIP) + 1;
   const n = String((i % PER_CLIP) + 1).padStart(3, "0");
-  return `/assets/seq/c${clip}_${n}.webp`;
+  return `/assets/seq/c${clip}_${n}.webp?v=${SEQ_VERSION}`;
 };
 // Frame index where the camera rests on event k.
 const holdFrame = (k: number) => (k === 0 ? 0 : k * PER_CLIP - 1);

@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { preload } from "react-dom";
+import BackgroundMusic from "@/components/BackgroundMusic";
 import RsvpModal from "@/components/RsvpModal";
-import { createJourney, type JourneyState } from "@/lib/journey";
+import { createJourney, frameSrc, type JourneyState } from "@/lib/journey";
 import { downloadIcs } from "@/lib/ics";
 import {
   CONTACT, EVENTS, SITE, fmtDate, fmtTime, getCountdown, mapsUrl, parseLocal, phoneLinks,
@@ -88,7 +89,11 @@ function HeroCard({ active }: { active: boolean }) {
         With the blessings of Allah and our families, we invite you to celebrate our wedding with us.
       </p>
       <Countdown />
-      <div className="card__badge"><i />Baat pakki · it&apos;s official</div>
+      <p className="card__badge" aria-label="Baat pakki, it's official">
+        <span className="card__badge-ur" lang="ur" dir="rtl" aria-hidden="true">بات پکی</span>
+        <svg className="card__badge-star" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0l1.3 4.7L12 6 7.3 7.3 6 12 4.7 7.3 0 6l4.7-1.3z" /></svg>
+        <span className="card__badge-en" aria-hidden="true">It&apos;s official</span>
+      </p>
       <div className="card__scroll" aria-hidden="true"><span>Scroll to begin</span><i /></div>
     </article>
   );
@@ -135,10 +140,12 @@ function EventCard({ ev, active }: { ev: WeddingEvent; active: boolean }) {
   );
 }
 
+const MIN_LOADER_MS = 1300;
+
 export default function WeddingJourney() {
   // Start fetching the opening photo and first frame from the HTML itself, before any JS runs.
   preload("/assets/stills/engagement.webp", { as: "image", fetchPriority: "high" });
-  preload("/assets/seq/c1_001.webp", { as: "image", fetchPriority: "high" });
+  preload(frameSrc(0), { as: "image", fetchPriority: "high" });
 
   const fgRef = useRef<HTMLCanvasElement>(null);
   const bgRef = useRef<HTMLCanvasElement>(null);
@@ -147,8 +154,12 @@ export default function WeddingJourney() {
   const shadeRef = useRef<HTMLDivElement>(null);
   const journeyRef = useRef<ReturnType<typeof createJourney>>(null);
 
+  // The loader stays up at least MIN_LOADER_MS from when the page started opening, so the
+  // Bismillah can be read; slow connections that already took longer don't wait extra.
+  // The counter climbs with whichever is slower: real loading or that minimum time.
   const [pct, setPct] = useState(0);
-  const [ready, setReady] = useState(false);
+  const loadPct = useRef(0);
+  const ready = pct >= 100;
   const [state, setState] = useState<JourneyState>({ card: 0, rail: 0, outro: false, scrolled: false, transit: -1 });
   const [rsvpOpen, setRsvpOpen] = useState(false);
   const closeRsvp = useCallback(() => setRsvpOpen(false), []);
@@ -162,11 +173,21 @@ export default function WeddingJourney() {
       outroShade: shadeRef.current!,
       eventCount: EVENTS.length,
       onState: setState,
-      onProgress: setPct,
-      onReady: () => setReady(true),
+      onProgress: (p) => { loadPct.current = Math.min(p, 99); },
+      onReady: () => { loadPct.current = 100; },
     });
     journeyRef.current = journey;
-    return () => journey.destroy();
+
+    // A timer rather than requestAnimationFrame: rAF is paused in background tabs, which
+    // would leave the loader frozen for anyone who opens the link in a new tab.
+    const timer = setInterval(() => {
+      const byTime = (performance.now() / MIN_LOADER_MS) * 100;
+      const next = Math.floor(Math.min(loadPct.current, byTime));
+      setPct((cur) => Math.max(cur, next));
+      if (next >= 100) clearInterval(timer);
+    }, 30);
+
+    return () => { clearInterval(timer); journey.destroy(); };
   }, []);
 
   useEffect(() => {
@@ -241,13 +262,16 @@ export default function WeddingJourney() {
       </section>
 
       {ready && (
-        <button
-          type="button"
-          className={`rsvp-fab${state.card === 0 ? " is-hero" : ""}${state.outro || rsvpOpen ? " is-hidden" : ""}`}
-          onClick={() => setRsvpOpen(true)}
-        >
-          <i aria-hidden="true" />RSVP
-        </button>
+        <div className="top-actions">
+          <button
+            type="button"
+            className={`rsvp-fab${state.card === 0 ? " is-hero" : ""}${state.outro || rsvpOpen ? " is-hidden" : ""}`}
+            onClick={() => setRsvpOpen(true)}
+          >
+            <i aria-hidden="true" />RSVP
+          </button>
+          <BackgroundMusic />
+        </div>
       )}
 
       {ready && <RsvpModal open={rsvpOpen} onClose={closeRsvp} />}

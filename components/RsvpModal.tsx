@@ -24,7 +24,8 @@ const Check = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5
 
 export default function RsvpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [attending, setAttending] = useState(true);
-  const [events, setEvents] = useState<string[]>(RSVP_EVENT_IDS);
+  // Nothing is pre-selected: guests tick the events they're coming to.
+  const [events, setEvents] = useState<string[]>([]);
   const [name, setName] = useState(() => saved().name ?? "");
   const [email, setEmail] = useState(() => saved().email ?? "");
   const [phone, setPhone] = useState(() => saved().phone ?? "");

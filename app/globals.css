@@ -41,7 +41,7 @@ a { color: inherit; }
 .loader__bismillah { font-family: var(--arabic); font-size: 26px; color: var(--gold); margin: 0 0 14px; }
 .loader__names { font-family: var(--serif); font-size: clamp(34px, 9vw, 56px); font-style: italic; margin: 0 0 28px; letter-spacing: .01em; }
 .loader__bar { width: min(220px, 60vw); height: 1px; background: rgba(247,240,228,.15); margin: 0 auto; overflow: hidden; }
-.loader__bar span { display: block; height: 100%; width: 0; background: var(--gold); transition: width .25s linear; }
+.loader__bar span { display: block; height: 100%; width: 0; background: var(--gold); transition: width .12s linear; }
 .loader__pct { font-size: 11px; letter-spacing: .3em; color: var(--ivory-dim); margin: 14px 0 0; }
 
 /* ---------- Stage ---------- */
@@ -120,13 +120,23 @@ a { color: inherit; }
 .card--hero .card__names em { font-style: italic; font-weight: 400; color: var(--gold); font-size: .72em; margin: 0 .16em; }
 .card__hon { font-style: italic; font-weight: 400; color: var(--gold); font-size: .52em; letter-spacing: .03em; margin-right: .22em; }
 .card--hero .card__lede { font-size: 14px; color: var(--ivory-dim); margin: 10px auto 0; max-width: 34ch; line-height: 1.5; }
+/* "Baat pakki" line: Urdu calligraphy, a small gold star and engraved small caps,
+   framed by hairline rules that fade out at the ends. */
 .card__badge {
-  display: inline-flex; align-items: center; gap: 8px;
-  margin-top: 16px; padding: 7px 14px; border-radius: 999px;
-  border: 1px solid var(--line); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
-  background: rgba(15,11,8,.35);
+  display: inline-flex; align-items: center; gap: 12px;
+  margin: 16px 0 0; color: var(--gold);
 }
-.card__badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+.card__badge::before, .card__badge::after {
+  content: ""; width: 34px; height: 1px; flex: none;
+  background: linear-gradient(90deg, transparent, rgba(217,181,111,.8));
+}
+.card__badge::after { transform: scaleX(-1); }
+.card__badge-ur { font-family: var(--urdu); font-size: 19px; line-height: 1.9; margin-top: -6px; }
+.card__badge-star { width: 9px; height: 9px; fill: var(--gold); opacity: .85; }
+.card__badge-en {
+  font-family: var(--serif); font-style: italic; font-size: 16px; letter-spacing: .04em;
+  color: var(--ivory);
+}
 
 /* Countdown (hero) */
 .countdown { margin: 14px 0 0; }
@@ -252,8 +262,13 @@ a { color: inherit; }
 
 /* ---------- RSVP: floating button ---------- */
 body.is-modal { overflow: hidden; }
-.rsvp-fab {
+/* Top-right corner: RSVP pill, then the music toggle at the very edge (it stays put
+   while the pill hides on the opening screen and the closing section). */
+.top-actions {
   position: fixed; z-index: 7; top: calc(14px + env(safe-area-inset-top)); right: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.rsvp-fab {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 16px; border-radius: 999px; border: 1px solid var(--gold);
   background: rgba(15,11,8,.5); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
@@ -266,6 +281,30 @@ body.is-modal { overflow: hidden; }
 .rsvp-fab.is-hidden { opacity: 0; pointer-events: none; transform: translateY(-8px); }
 /* Phones: the top of the opening screen belongs to the Bismillah. */
 @media (max-width: 899px) { .rsvp-fab.is-hero { opacity: 0; pointer-events: none; transform: translateY(-8px); } }
+
+/* ---------- Music toggle ---------- */
+.music-btn {
+  flex: none; width: 40px; height: 40px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  border: 1px solid rgba(217,181,111,.55); background: rgba(15,11,8,.5);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  animation: music-in .6s var(--ease) both;
+  transition: background .25s, border-color .25s, transform .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.music-btn:hover { background: rgba(217,181,111,.2); border-color: var(--gold); }
+.music-btn:active { transform: scale(.92); }
+.music-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.music-btn svg { width: 18px; height: 18px; fill: none; stroke: var(--ivory); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.music-btn__spk { fill: var(--ivory); stroke: none; }
+.music-btn:not(.is-playing) svg { opacity: .7; }
+.music-btn.is-playing { border-color: var(--gold); }
+.music-btn.is-playing svg { stroke: var(--gold); }
+.music-btn.is-playing .music-btn__spk { fill: var(--gold); }
+.music-btn__waves path { animation: music-wave 1.6s ease-in-out infinite; }
+.music-btn__waves path + path { animation-delay: .25s; }
+@keyframes music-wave { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@keyframes music-in { from { opacity: 0; transform: translateY(-8px); } }
 
 .outro__cta {
   min-width: 220px; min-height: 50px; flex: none;
@@ -335,7 +374,7 @@ body.is-modal { overflow: hidden; }
 /* Event push-buttons with the event photo behind */
 .rsvp-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .rsvp-tile {
-  position: relative; isolation: isolate; aspect-ratio: 4 / 5; overflow: hidden; padding: 0; text-align: left; cursor: pointer;
+  position: relative; isolation: isolate; aspect-ratio: 10 / 11; overflow: hidden; padding: 0; text-align: left; cursor: pointer;
   border-radius: 18px; border: 1px solid rgba(247,240,228,.12); background: #1a130d;
   transition: transform .25s var(--ease), border-color .3s, box-shadow .45s var(--ease);
   -webkit-tap-highlight-color: transparent;
