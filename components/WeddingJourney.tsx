@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { preload } from "react-dom";
 import RsvpModal from "@/components/RsvpModal";
 import { createJourney, type JourneyState } from "@/lib/journey";
 import { downloadIcs } from "@/lib/ics";
@@ -135,6 +136,10 @@ function EventCard({ ev, active }: { ev: WeddingEvent; active: boolean }) {
 }
 
 export default function WeddingJourney() {
+  // Start fetching the opening photo and first frame from the HTML itself, before any JS runs.
+  preload("/assets/stills/engagement.webp", { as: "image", fetchPriority: "high" });
+  preload("/assets/seq/c1_001.webp", { as: "image", fetchPriority: "high" });
+
   const fgRef = useRef<HTMLCanvasElement>(null);
   const bgRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);

@@ -57,23 +57,13 @@ function loadImg(src: string) {
   return new Promise<HTMLImageElement | null>((resolve) => {
     const img = new Image();
     img.decoding = "async";
-    img.onload = () => img.decode().catch(() => {}).then(() => resolve(img));
+    // Resolve on load, not on decode(): browsers pause decoding in background tabs, and
+    // waiting on it would leave the loader stuck if the page opens in a hidden tab.
+    // Drawing to the canvas decodes the image on demand anyway.
+    img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
     img.src = src;
   });
-}
-
-async function loadQueue<T extends { src: string }>(
-  items: T[], concurrency: number, onEach: (item: T, img: HTMLImageElement | null) => void, alive: () => boolean,
-) {
-  let i = 0;
-  const worker = async () => {
-    while (i < items.length && alive()) {
-      const item = items[i++];
-      onEach(item, await loadImg(item.src));
-    }
-  };
-  await Promise.all(Array.from({ length: concurrency }, worker));
 }
 
 export function createJourney(o: Options) {
@@ -188,26 +178,54 @@ export function createJourney(o: Options) {
   }
 
   async function preload() {
-    const coarse: { i: number; src: string }[] = [], fine: { i: number; src: string }[] = [];
-    for (let i = 0; i < TOTAL; i++) {
-      const isCoarse = i % 4 === 0 || STILLS.some((_, k) => holdFrame(k) === i);
-      (isCoarse ? coarse : fine).push({ i, src: frameSrc(i) });
-    }
-    const first: { i?: number; still?: string; src: string }[] = [
-      ...STILLS.map((still) => ({ still, src: `/assets/stills/${still}.webp` })),
-      ...coarse,
-    ];
-    let done = 0;
-    await loadQueue(first, 6, (item, img) => {
-      if (img) { if (item.still) stills[item.still] = img; else frames[item.i!] = img; }
-      done++;
-      o.onProgress(Math.round((done / first.length) * 100));
-      dirty = true;
-    }, () => alive);
+    // 1. Only the opening photo and first frame gate the page (~0.2 MB), so it appears almost at once.
+    let gateDone = 0;
+    const gate = await Promise.all([`/assets/stills/${STILLS[0]}.webp`, frameSrc(0)].map(async (src) => {
+      const img = await loadImg(src);
+      o.onProgress(Math.round((++gateDone / 2) * 100));
+      return img;
+    }));
     if (!alive) return;
+    if (gate[0]) stills[STILLS[0]] = gate[0];
+    if (gate[1]) frames[0] = gate[1];
     o.onReady();
     dirty = true;
-    loadQueue(fine, 4, (item, img) => { if (img) { frames[item.i] = img; dirty = true; } }, () => alive);
+
+    // 2. Everything else streams in the background, always fetching what's nearest the current
+    //    scroll position first. Every 4th frame is favoured so a fast scroll still has coverage
+    //    (the renderer falls back to the nearest loaded frame), and each event's photo is fetched
+    //    a little before its stop is reached.
+    const pendingFrames = new Set<number>();
+    for (let i = 1; i < TOTAL; i++) pendingFrames.add(i);
+    const pendingStills = new Set(STILLS.slice(1));
+    const pick = (): { frame: number } | { still: string } | null => {
+      const f = target.f;
+      let best: { frame: number } | { still: string } | null = null, bestD = Infinity;
+      for (const i of pendingFrames) {
+        const d = Math.abs(i - f) + (i % 4 ? 8 : 0);
+        if (d < bestD) { bestD = d; best = { frame: i }; }
+      }
+      for (const name of pendingStills) {
+        const d = Math.abs(holdFrame(STILLS.indexOf(name)) - f) - 12;
+        if (d < bestD) { bestD = d; best = { still: name }; }
+      }
+      return best;
+    };
+    const worker = async () => {
+      for (let next = pick(); next && alive; next = pick()) {
+        if ("still" in next) {
+          pendingStills.delete(next.still);
+          const img = await loadImg(`/assets/stills/${next.still}.webp`);
+          if (img) stills[next.still] = img;
+        } else {
+          pendingFrames.delete(next.frame);
+          const img = await loadImg(frameSrc(next.frame));
+          if (img) frames[next.frame] = img;
+        }
+        dirty = true;
+      }
+    };
+    await Promise.all(Array.from({ length: 6 }, worker));
   }
 
   function onResize() {
