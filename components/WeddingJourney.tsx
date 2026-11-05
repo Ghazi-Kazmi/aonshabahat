@@ -140,7 +140,7 @@ function EventCard({ ev, active }: { ev: WeddingEvent; active: boolean }) {
   );
 }
 
-const MIN_LOADER_MS = 1300;
+const MIN_LOADER_MS = 2500;
 
 export default function WeddingJourney() {
   // Start fetching the opening photo and first frame from the HTML itself, before any JS runs.
